@@ -8,7 +8,13 @@
 
 import Foundation
 
+protocol CoinManagerDelegate {
+    func didUpdatePrice(price: String, currency: String)
+    func didFailWithError(error: Error)
+}
+
 struct CoinManager {
+    var delegate: CoinManagerDelegate?
     
     let baseURL = "https://rest.coinapi.io/v1/exchangerate/BTC"
     let apiKey = "DFBEA535-D5FB-4FC1-A085-BA26E0CFEFF9"
@@ -17,12 +23,7 @@ struct CoinManager {
 
     func getCoinPrice(for currency: String) {
         let urlString = "\(baseURL)/\(currency)/?apikey=\(apiKey)"
-        print(urlString)
-        preformRequest(with: urlString)
-    }
-    
-    func preformRequest (with urlString: String)
-    {
+ 
         if let url = URL(string: urlString)
         {
             let session = URLSession(configuration: .default)
@@ -30,16 +31,39 @@ struct CoinManager {
             { (data, response, error) in
                 if error != nil
                 {
-                    print(error!)
+                    self.delegate?.didFailWithError(error: error!)
                     return
                 }
-            let dataAsString = String(data: data!, encoding: .utf8)
-                print(dataAsString!)
+            if let safeData = data {
+                if let bitcoinPrice = self.parseJSON(safeData) {
+                    let priceString = String(format: "%.2f", bitcoinPrice)
+                    self.delegate?.didUpdatePrice(price: priceString, currency: currency)
+                }
+                }
             }
-        task.resume()
-        }
+                task.resume()
         
+        }
     }
+        
+        
+    func parseJSON(_ data: Data) -> Double?
+        {
+            let decoder = JSONDecoder()
+            do
+            {
+                let decodedData = try decoder.decode(CoinData.self, from: data)
+                let lastPrice = decodedData.rate
+                print(lastPrice)
+                return lastPrice
+                
+            }
+            catch
+            {
+                delegate?.didFailWithError(error: error)
+                return nil
+            }
+        }
             
     
 }
